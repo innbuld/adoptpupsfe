@@ -8,13 +8,18 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(false);
 
+  // State for token holders
+  const [holders, setHolders] = useState<string[]>([]);
+  const [holdersLoading, setHoldersLoading] = useState<boolean>(true);
+  const [isHolderResult, setIsHolderResult] = useState<boolean | null>(null);
+
   // Placeholder puppy data
   const puppies = [
-    { name: "Puppy #1", image: "/puppies/puppy1.png" },
-    { name: "Puppy #2", image: "/puppies/puppy2.png" },
-    { name: "Puppy #3", image: "/puppies/puppy3.png" },
-    { name: "Puppy #4", image: "/puppies/puppy4.png" },
-    { name: "Puppy #5", image: "/puppies/puppy5.png" },
+    { name: "Wallet #1", image: "/puppies/puppy1.png" },
+    { name: "Wallet #2", image: "/puppies/puppy2.png" },
+    { name: "Wallet #3", image: "/puppies/puppy3.png" },
+    { name: "Wallet #4", image: "/puppies/puppy4.png" },
+    { name: "Wallet #5", image: "/puppies/puppy5.png" },
   ];
 
   // Randomly select a puppy of the day
@@ -24,24 +29,53 @@ export default function Home() {
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString());
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
-    return () => clearInterval(timer); // Cleanup timer
+    return () => clearInterval(timer);
   }, []);
 
-  // Handle wallet search
-  const handleSearch = () => {
+  // Fetch all holders on mount
+  useEffect(() => {
+    const fetchHolders = async () => {
+      try {
+        const res = await fetch("/api/holders");
+        const data = await res.json();
+        setHolders(data.holders || []);
+      } catch (err) {
+        console.error("Error fetching holders:", err);
+      } finally {
+        setHoldersLoading(false);
+      }
+    };
+
+    fetchHolders();
+  }, []);
+
+  // Handle wallet search - check if the entered address is a holder
+  const handleSearch = async () => {
     if (!walletAddress) {
       setError("Please enter a valid wallet address.");
-    } else {
-      setError(null);
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        alert(`Searching for wallet: ${walletAddress}`);
-      }, 2000); // Simulate a delay
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    setIsHolderResult(null);
+
+    try {
+      const res = await fetch(`/api/holder/${walletAddress}`);
+      const data = await res.json();
+      if (res.ok) {
+        setIsHolderResult(data.isHolder);
+      } else {
+        setError(data.error || "Unknown error occurred.");
+      }
+    } catch (err: any) {
+      setError("Error fetching holder data.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Pagination logic
+  // Pagination logic for puppies
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 4;
   const indexOfLast = currentPage * itemsPerPage;
@@ -61,17 +95,24 @@ export default function Home() {
         {darkMode ? "Light Mode" : "Dark Mode"}
       </button>
 
-      {/* Header */}
-      <header className="flex justify-between items-center p-4 text-sm font-bold">
-        <span>{time}</span>
-        <span>LTE 88</span>
-      </header>
-
       {/* Main Content */}
       <main className="flex flex-col items-center w-full p-6">
         {/* Holders Section */}
-        <div className="bg-yellow-300 px-4 py-2 rounded-md mb-4">
-          Holders: Loading... (3 minutes delay)
+        <div className="bg-yellow-300 px-4 py-2 rounded-md mb-4 w-full max-w-xl">
+          <h2 className="text-xl font-bold mb-2">Holders</h2>
+          {holdersLoading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+            </div>
+          ) : (
+            <div className="overflow-auto max-h-40">
+              <ul className="list-disc ml-5">
+                {holders.map((holder) => (
+                  <li key={holder}>{holder}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Title */}
@@ -116,10 +157,19 @@ export default function Home() {
             Search
           </button>
         </div>
-        {error && <div className="text-red-500">{error}</div>}
+        {error && <div className="text-red-500 mb-4">{error}</div>}
         {loading && (
           <div className="flex items-center justify-center my-6">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-yellow-300"></div>
+          </div>
+        )}
+        {isHolderResult !== null && (
+          <div className="mb-4">
+            {isHolderResult ? (
+              <p className="text-green-600 font-bold">{walletAddress} is a holder!</p>
+            ) : (
+              <p className="text-red-600 font-bold">{walletAddress} is not a holder.</p>
+            )}
           </div>
         )}
 
